@@ -1,0 +1,129 @@
+{% extends "member/base.html" %}
+{% block title %}낙상 감지 시스템{% endblock %}
+
+{% block content %}
+<h2>낙상 감지 시스템</h2>
+
+<div style="display: flex; gap: 20px;">
+  <!-- 📷 카메라 스트림 + 버튼 -->
+  <div id="camera-wrapper" style="position: relative; width: 800px; height: 500px; background: black;">
+    <img
+      id="pose-stream"
+      src="{% url 'pose_estimation_feed' %}"
+      style="width: 100%; height: 100%; object-fit: cover"
+    />
+
+    <!-- 🔲 검정색 오버레이 (화면만 가림) -->
+    <div id="black-overlay" style="
+      display: none;
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: black;
+      opacity: 0.85;
+      z-index: 10;
+    "></div>
+
+    <!-- 보호모드 버튼 -->
+    <button id="privacy-btn" style="
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      padding: 6px 10px;
+      font-size: 12px;
+      background: purple;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      z-index: 11;
+    ">
+      보호모드
+    </button>
+
+    <!-- 테스트 알림 버튼 -->
+    <button id="alert-btn" style="
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      padding: 6px 10px;
+      font-size: 12px;
+      background: orange;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      z-index: 11;
+    ">
+      테스트 알림
+    </button>
+  </div>
+
+  <!-- 🧠 낙상 상태 표시 -->
+  <div style="width: 300px;">
+    <h3>낙상 감지 상태</h3>
+    <div id="fall-status" style="font-size: 20px; font-weight: bold; color: green;">
+      정상입니다
+    </div>
+  </div>
+</div>
+
+<!-- toastr 알림 CDN -->
+<link href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css" rel="stylesheet" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js"></script>
+
+<script>
+  toastr.options = {
+    closeButton: true,
+    progressBar: true,
+    positionClass: "toast-top-right",
+    timeOut: "1500",
+  };
+
+  const overlay = document.getElementById("black-overlay");
+  const statusBox = document.getElementById("fall-status");
+
+  // ✅ 보호모드 토글
+  document.getElementById("privacy-btn").addEventListener("click", function () {
+    fetch("{% url 'toggle_privacy_mode' %}")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.privacy_mode) {
+          overlay.style.display = "block";
+          toastr.success("🔒 보호모드 활성화");
+        } else {
+          overlay.style.display = "none";
+          toastr.info("🔓 보호모드 해제");
+        }
+      });
+  });
+
+  // ✅ 테스트 낙상 알림
+  document.getElementById("alert-btn").addEventListener("click", function () {
+    fetch("{% url 'test_fall_alert' %}", {
+      method: "POST",
+      headers: {
+        "X-CSRFToken": "{{ csrf_token }}",
+      },
+    })
+    .then((res) => res.json())
+    .then((data) => {
+      toastr.warning("📢 " + data.status);
+    });
+  });
+
+  // ✅ 실시간 낙상 감지 상태 가져오기
+  function pollFallStatus() {
+    fetch("/fall/fall_status/")
+      .then((res) => res.json())
+      .then((data) => {
+        statusBox.textContent = data.label;
+        statusBox.style.color = data.fall ? "red" : "green";
+      });
+  }
+
+  setInterval(pollFallStatus, 1000); // 1초마다 감지 상태 갱신
+</script>
+{% endblock %}
